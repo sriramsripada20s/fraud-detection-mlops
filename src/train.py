@@ -132,18 +132,29 @@ def train(data_dir: str = DATA_DIR) -> str:
         y     = df['isFraud']
         del df; gc.collect()
 
-        X_tr_raw, X_val_raw, y_train, y_val = train_test_split(
+        # First split — carve out 15% test set (never seen during training)
+        X_trainval, X_test_raw, y_trainval, y_test = train_test_split(
             X_raw, y,
-            test_size=0.2,
+            test_size=0.15,
             stratify=y,
             random_state=42,
         )
-        del X_raw; gc.collect()
+
+        # Second split — remaining 85% split into 70% train / 15% val
+        X_tr_raw, X_val_raw, y_train, y_val = train_test_split(
+            X_trainval, y_trainval,
+            test_size=0.176,   # 0.176 x 0.85 ≈ 0.15 of total
+            stratify=y_trainval,
+            random_state=42,
+        )
+        del X_raw, X_trainval, y_trainval; gc.collect()
 
         print(f"Train : {X_tr_raw.shape[0]:,} rows "
               f"| fraud: {y_train.mean()*100:.2f}%")
         print(f"Val   : {X_val_raw.shape[0]:,} rows "
               f"| fraud: {y_val.mean()*100:.2f}%")
+        print(f"Test  : {X_test_raw.shape[0]:,} rows "
+              f"| fraud: {y_test.mean()*100:.2f}%")
 
         # ----------------------------------------------------------
         # 3. Feature engineering
@@ -257,12 +268,51 @@ def train(data_dir: str = DATA_DIR) -> str:
             save_dir=PROCESSED_DIR,
             split_name='val',
         )
+
         train_metrics = full_evaluation(
             y_train.values, train_proba,
             threshold=best_threshold,
             save_dir=PROCESSED_DIR,
             split_name='train',
         )
+
+        # Overfitting check — train after both are defined
+        ap_gap = train_metrics['avg_precision'] - val_metrics['avg_precision']
+        print(f"Overfit gap (train AP - val AP): {ap_gap:.4f}")
+        if ap_gap > 0.15:
+            print("WARNING: Possible overfitting — consider more regularisation")
+        
+        # Evaluate on held-out test set — truly unseen data
+        print("\n" + "="*55)
+        print("  STEP 6b — Test set evaluation (held-out)")
+        print("="*55)
+
+        # Engineer test features using train's freq_maps/label_encoders
+        test_df           = X_test_raw.copy()
+        test_df['isFraud']= y_test.values
+        test_eng, _, _    = engineer_features(
+            test_df, freq_maps, label_encoders, fit=False
+        )
+        del test_df, X_test_raw; gc.collect()
+
+        X_test      = test_eng[feature_cols]
+        test_proba  = model.predict_proba(X_test)[:, 1]
+
+        test_metrics = full_evaluation(
+            y_test.values, test_proba,
+            threshold=best_threshold,
+            save_dir=PROCESSED_DIR,
+            split_name='test',
+        )
+
+        if use_mlflow:
+            for k, v in test_metrics.items():
+                if isinstance(v, (int, float)):
+                    mlflow.log_metric(f'test_{k}', v)
+
+        # Save test metrics
+        with open(os.path.join(PROCESSED_DIR, 'test_results.json'), 'w') as f:
+            json.dump(test_metrics, f, indent=2)
 
         # Overfitting check
         ap_gap = train_metrics['avg_precision'] - val_metrics['avg_precision']

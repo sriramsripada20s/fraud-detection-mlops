@@ -1,0 +1,15 @@
+{
+  "auc_roc": 0.9537,
+  "avg_precision": 0.7177,
+  "f1_fraud": 0.6249,
+  "f2_fraud": 0.6805,
+  "precision_fraud": 0.5501,
+  "recall_fraud": 0.7234,
+  "threshold": 0.6999,
+  "true_positives": 2236,
+  "false_positives": 1829,
+  "true_negatives": 83425,
+  "false_negatives": 855,
+  "fraud_caught_pct": 72.34,
+  "false_alarm_rate": 2.15
+}
