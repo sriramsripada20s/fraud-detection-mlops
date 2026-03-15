@@ -1,0 +1,14 @@
+{
+  "model": "XGBoost baseline (minimal preprocessing)",
+  "n_estimators": 299,
+  "auc_roc": 0.9182,
+  "avg_precision": 0.6257,
+  "random_ap_baseline": 0.035,
+  "optimal_threshold": 0.5401,
+  "precision_fraud": 0.4014,
+  "recall_fraud": 0.6747,
+  "f1_fraud": 0.5034,
+  "f2_fraud": 0.5939,
+  "fraud_caught_pct": 67.47,
+  "false_alarm_rate": 3.65
+}
