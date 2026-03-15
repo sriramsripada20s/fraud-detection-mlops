@@ -248,8 +248,10 @@ class FraudPredictor:
             le  = self.label_encoders.get(col)
             raw = str(payload.get(col) or 'unknown')
             if le is not None:
-                if raw not in set(le.classes_):
-                    raw = 'unknown'
+                known = set(le.classes_)
+                if raw not in known:
+                    # Fall back to first known class if unknown not in encoder
+                    raw = le.classes_[0] if 'unknown' not in known else 'unknown'
                 row[col] = int(le.transform([raw])[0])
             else:
                 row[col] = 0
