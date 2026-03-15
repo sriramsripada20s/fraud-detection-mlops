@@ -1,0 +1,11 @@
+Column Group,Strategy,Reason
+V1-V339,Fill null → 0,"Null = feature not triggered, not unknown. -999 misleads XGBoost."
+id_01..id_11 (numeric),Fill → -1 + _missing flag,Null is informative — fraudsters skip identity. Flag preserves signal.
+id_12..id_38 (categorical),Fill → unknown + label encode,"Categorical — unknown is a valid category, not missing data."
+"card1, card2, card3, card5",Fill → median,Numeric card attributes — median avoids outlier distortion.
+"card1, card2, addr1, addr2",Frequency encode,High cardinality — freq count captures velocity signal without OHE explosion.
+"ProductCD, card4, card6, email domains",Fill unknown + label encode,Low cardinality categoricals — label encode sufficient for tree models.
+M1-M9 (match flags),Fill unknown + label encode,T/F/null all carry different signal — null ≠ F.
+TransactionAmt,log1p + decimal + cents + is_round,Right-skewed. Decimal and round-number patterns correlate with fraud.
+TransactionDT,"Extract hour, day_of_week, is_night, is_weekend → drop raw",Raw seconds meaningless. Time-of-day patterns directly predictive.
+Identity block presence,Create has_identity binary flag,Missing identity = 2x fraud rate. Single flag captures this signal.
