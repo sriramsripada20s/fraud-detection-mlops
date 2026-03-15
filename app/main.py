@@ -27,11 +27,11 @@ from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from schema import (
+from app.schema import (
     TransactionRequest, PredictionResponse,
     BatchRequest, BatchResponse, HealthResponse,
 )
-from predictor import get_predictor, FraudPredictor
+from app.predictor import get_predictor, FraudPredictor
 
 load_dotenv()
 
