@@ -291,9 +291,11 @@ def engineer_features(
         else:
             le = label_encoders.get(col)
             if le is not None:
-                known   = set(le.classes_)
+                known = set(le.classes_)
+                # Fall back to first known class if 'unknown' not in encoder
+                fallback = 'unknown' if 'unknown' in known else le.classes_[0]
                 df[col] = df[col].apply(
-                    lambda x: x if x in known else 'unknown'
+                    lambda x: x if x in known else fallback
                 )
                 df[col] = le.transform(df[col])
             else:
@@ -322,8 +324,9 @@ def engineer_features(
                 le = label_encoders.get(col)
                 if le is not None:
                     known   = set(le.classes_)
+                    fallback = 'unknown' if 'unknown' in known else le.classes_[0]
                     df[col] = df[col].astype(str).apply(
-                        lambda x: x if x in known else 'unknown'
+                        lambda x: x if x in known else fallback
                     )
                     df[col] = le.transform(df[col])
                 else:
