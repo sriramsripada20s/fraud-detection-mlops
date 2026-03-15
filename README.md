@@ -233,7 +233,7 @@ POST /predict          — single transaction scoring
 POST /predict/batch    — up to 100 transactions
 GET  /docs             — Swagger UI
 ```
-
+[Swagger UI Batch Request Response](docs/screenshots/swagger.png)
 ---
 
 ## AWS Deployment
