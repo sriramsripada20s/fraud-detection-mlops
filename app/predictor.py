@@ -17,6 +17,27 @@ V/C/D vendor features:
 Singleton pattern:
   Model loads once at API startup via get_predictor()
   Not reloaded per request — keeps latency low
+
+
+**What predictor.py does step by step:**
+```
+API payload (22 fields)
+        ↓
+_build_feature_row()
+  → time features    (hour, is_night, is_weekend)
+  → amount features  (log1p, decimal, cents, is_round)
+  → freq encoding    (card1_freq, addr1_freq using saved freq_maps)
+  → velocity         (card1_fraud_rate, amt_vs_card_avg from freq_maps)
+  → identity flags   (has_identity, id_01_missing...)
+  → categoricals     (label encode using saved label_encoders)
+  → V/C/D = 0        (vendor features default to 0)
+        ↓
+Full 462-feature row
+        ↓
+model.predict_proba()
+        ↓
+score → action → response
+
 """
 
 import os
