@@ -60,6 +60,7 @@ CAT_COLS = [
     'ProductCD', 'card4', 'card6',
     'P_emaildomain', 'R_emaildomain',
     'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9',
+    'DeviceType', 'DeviceInfo',
 ]
 
 ID_CAT_COLS = [
@@ -258,15 +259,30 @@ def engineer_features(
     # ----------------------------------------------------------
     # 8. Fill any remaining nulls with 0
     # ----------------------------------------------------------
+    # 8. Fill any remaining nulls with 0
     df = df.fillna(0)
 
-    # ----------------------------------------------------------
-    # 9. Drop columns not needed for training
-    # ----------------------------------------------------------
-    df = df.drop(
-        columns=[c for c in DROP_COLS if c in df.columns],
-        errors='ignore'
-    )
+    # 9. Safety net — encode any remaining object columns
+    #    catches columns missed by explicit lists above
+    remaining_obj = df.select_dtypes(include='object').columns.tolist()
+    remaining_obj = [c for c in remaining_obj if c != 'isFraud']
+    if remaining_obj:
+        print(f"Safety encoding {len(remaining_obj)} remaining object cols: {remaining_obj}")
+        for col in remaining_obj:
+            if fit:
+                le = LabelEncoder()
+                df[col] = le.fit_transform(df[col].astype(str))
+                label_encoders[col] = le
+            else:
+                le = label_encoders.get(col)
+                if le is not None:
+                    known   = set(le.classes_)
+                    df[col] = df[col].astype(str).apply(
+                        lambda x: x if x in known else 'unknown'
+                    )
+                    df[col] = le.transform(df[col])
+                else:
+                    df[col] = 0
 
     return df, freq_maps, label_encoders
 
