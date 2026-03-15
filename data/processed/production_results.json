@@ -1,15 +1,15 @@
 {
-  "auc_roc": 0.9085,
-  "avg_precision": 0.5415,
-  "f1_fraud": 0.4606,
-  "f2_fraud": 0.5709,
-  "precision_fraud": 0.3484,
-  "recall_fraud": 0.6794,
-  "threshold": 0.6836,
-  "true_positives": 2100,
-  "false_positives": 3928,
-  "true_negatives": 81326,
-  "false_negatives": 991,
-  "fraud_caught_pct": 67.94,
-  "false_alarm_rate": 4.61
+  "auc_roc": 0.9357,
+  "avg_precision": 0.7147,
+  "f1_fraud": 0.6255,
+  "f2_fraud": 0.6823,
+  "precision_fraud": 0.5493,
+  "recall_fraud": 0.7263,
+  "threshold": 0.7091,
+  "true_positives": 2245,
+  "false_positives": 1842,
+  "true_negatives": 83412,
+  "false_negatives": 846,
+  "fraud_caught_pct": 72.63,
+  "false_alarm_rate": 2.16
 }
