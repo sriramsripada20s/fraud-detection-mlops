@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BUCKET        = os.getenv('S3_BUCKET',          'fraud-detection-mlops-sriram')
+BUCKET        = os.getenv('S3_BUCKET',          'bucket-name')
 ROLE_ARN      = os.getenv('SAGEMAKER_ROLE_ARN',  '')
 REGION        = os.getenv('AWS_REGION',          'us-east-1')
 ENDPOINT_NAME = 'fraud-detection-endpoint'
