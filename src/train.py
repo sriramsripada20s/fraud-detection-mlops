@@ -407,5 +407,148 @@ class _dummy_context:
 # Entry point
 # ------------------------------------------------------------------
 if __name__ == '__main__':
-    data_dir = sys.argv[1] if len(sys.argv) > 1 else DATA_DIR
-    train(data_dir)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data-dir', type=str, default=DATA_DIR)
+    args, _ = parser.parse_known_args()
+    train(args.data_dir)
+
+# ------------------------------------------------------------------
+# SageMaker serving functions
+# Required for SageMaker endpoint to load and serve the model
+# ------------------------------------------------------------------
+def model_fn(model_dir):
+    """Load model artifact for SageMaker endpoint."""
+    import os
+    import joblib
+    model_path = os.path.join(model_dir, 'model.joblib')
+    print(f"Loading model from {model_path}")
+    artifact = joblib.load(model_path)
+    print(f"Model loaded | features={len(artifact['feature_cols'])} | threshold={artifact['threshold']:.4f}")
+    return artifact
+
+
+def input_fn(request_body, content_type='application/json'):
+    """Parse incoming request."""
+    import json
+    if content_type == 'application/json':
+        return json.loads(request_body)
+    raise ValueError(f"Unsupported content type: {content_type}")
+
+
+def predict_fn(input_data, artifact):
+    """Run fraud prediction."""
+    import sys
+    import numpy as np
+    import pandas as pd
+    sys.path.insert(0, '/opt/ml/code')
+
+    freq_maps      = artifact['freq_maps']
+    label_encoders = artifact['label_encoders']
+    feature_cols   = artifact['feature_cols']
+    model          = artifact['model']
+    threshold      = artifact['threshold']
+
+    # Start with all zeros
+    row = {col: 0 for col in feature_cols}
+
+    amt = float(input_data.get('TransactionAmt', 0) or 0)
+    dt  = int(input_data.get('TransactionDT', 86400) or 86400)
+
+    # Time features
+    hour = (dt // 3600) % 24
+    row['hour']        = hour
+    row['day_of_week'] = (dt // 86400) % 7
+    row['is_night']    = int(hour >= 22 or hour <= 5)
+    row['is_weekend']  = int(row['day_of_week'] >= 5)
+
+    # Amount features
+    row['TransactionAmt'] = amt
+    row['amt_log']        = np.log1p(amt)
+    row['amt_decimal']    = amt % 1
+    row['amt_cents']      = int(amt * 100) % 100
+    row['amt_is_round']   = int((amt % 1) == 0)
+
+    # Frequency encoding
+    for col in ['card1', 'card2', 'addr1', 'addr2']:
+        freq_map = freq_maps.get(col, {})
+        row[f'{col}_freq'] = int(freq_map.get(input_data.get(col), 0))
+
+    # Velocity features
+    card1_val      = input_data.get('card1')
+    card_stats_map = freq_maps.get('card1_stats', {})
+    card_stats     = card_stats_map.get(card1_val, {})
+    row['card1_txn_count']  = card_stats.get('card1_txn_count',  0)
+    row['card1_avg_amt']    = card_stats.get('card1_avg_amt',    0)
+    row['card1_max_amt']    = card_stats.get('card1_max_amt',    0)
+    row['card1_fraud_rate'] = card_stats.get('card1_fraud_rate', 0)
+    card_avg = row['card1_avg_amt']
+    card_max = row['card1_max_amt']
+    row['amt_vs_card_avg'] = amt / card_avg if card_avg > 0 else 1.0
+    row['amt_vs_card_max'] = amt / card_max if card_max > 0 else 1.0
+    hour_map = freq_maps.get('hour_fraud_rate', {})
+    row['hour_fraud_rate'] = float(hour_map.get(hour, 0))
+
+    # Identity
+    row['has_identity'] = int(input_data.get('id_01') is not None)
+    id_num_cols = [f'id_{str(i).zfill(2)}' for i in range(1, 12)]
+    for col in id_num_cols:
+        val = input_data.get(col)
+        row[col] = float(val) if val is not None else -1.0
+        row[f'{col}_missing'] = int(val is None)
+
+    # Card numerics
+    for col in ['card1', 'card2', 'card3', 'card5']:
+        val    = input_data.get(col)
+        median = freq_maps.get(f'{col}_median', 0)
+        row[col] = float(val) if val is not None else median
+
+    # Categorical encoding
+    cat_cols = [
+        'ProductCD', 'card4', 'card6',
+        'P_emaildomain', 'R_emaildomain',
+        'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9',
+        'DeviceType', 'DeviceInfo',
+        'id_12', 'id_15', 'id_16', 'id_23', 'id_27', 'id_28',
+        'id_29', 'id_30', 'id_31', 'id_32', 'id_33', 'id_34',
+        'id_35', 'id_36', 'id_37', 'id_38',
+    ]
+    for col in cat_cols:
+        le  = label_encoders.get(col)
+        raw = str(input_data.get(col) or 'unknown')
+        if le is not None:
+            known    = set(le.classes_)
+            fallback = 'unknown' if 'unknown' in known else le.classes_[0]
+            raw      = raw if raw in known else fallback
+            row[col] = int(le.transform([raw])[0])
+        else:
+            row[col] = 0
+
+    # V/C/D default to 0
+    for i in range(1, 340):
+        row[f'V{i}'] = float(input_data.get(f'V{i}', 0) or 0)
+    for i in range(1, 15):
+        row[f'C{i}'] = float(input_data.get(f'C{i}', 0) or 0)
+    for i in range(1, 16):
+        row[f'D{i}'] = float(input_data.get(f'D{i}', 0) or 0)
+
+    X     = pd.DataFrame([row])[feature_cols]
+    score = float(model.predict_proba(X)[0][1])
+
+    is_fraud   = score >= threshold
+    action     = 'block' if is_fraud else ('review' if score >= 0.4 else 'allow')
+    confidence = 'high' if score >= 0.85 else ('medium' if score >= 0.60 else 'low')
+
+    return {
+        'fraud_score': round(score, 4),
+        'is_fraud':    is_fraud,
+        'action':      action,
+        'confidence':  confidence,
+        'threshold':   threshold,
+    }
+
+
+def output_fn(prediction, accept='application/json'):
+    """Format response."""
+    import json
+    return json.dumps(prediction), accept
