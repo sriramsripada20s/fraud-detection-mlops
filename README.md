@@ -269,10 +269,10 @@ GitHub secrets required: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SAGEMAKE
 
 ✅ Vendor feature strategy documented (AP=0.7162 with / AP=0.5484 without)
 
-🚧 FastAPI serving
+✅ FastAPI serving
 
-🚧 Tests
+✅ Tests
 
-🚧 Docker + CI/CD
+✅ AWS SageMaker deployment
 
-🚧 AWS SageMaker deployment
+🚧 CI/CD
