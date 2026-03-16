@@ -29,3 +29,7 @@ fraudenv/
 *.msi
 input.json
 response.json
+
+mlartifacts/
+mlruns/
+image.png
