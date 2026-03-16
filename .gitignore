@@ -25,3 +25,7 @@ __pycache__/
 .aws/
 
 fraudenv/
+
+*.msi
+input.json
+response.json
